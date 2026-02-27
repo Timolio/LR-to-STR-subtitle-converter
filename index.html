@@ -1,0 +1,958 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>LR → SRT</title>
+        <meta
+            name="description"
+            content="Convert your Language Reactor (LR) HTML export into an SRT subtitle file. Free, no sign-up, runs entirely in your browser."
+        />
+        <meta property="og:title" content="LR → SRT — subtitle converter" />
+        <meta
+            property="og:description"
+            content="Convert your Language Reactor HTML export into an SRT subtitle file. Free and entirely in your browser."
+        />
+        <meta property="og:type" content="website" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+            rel="stylesheet"
+        />
+        <style>
+            *,
+            *::before,
+            *::after {
+                box-sizing: border-box;
+                margin: 0;
+                padding: 0;
+            }
+
+            :root {
+                --bg: #0c0c0c;
+                --surface: #141414;
+                --line: #242424;
+                --line-hi: #363636;
+                --accent: #c8ff57;
+                --text: #f2f2f2;
+                --text-2: #7a7a7a;
+                --text-3: #3d3d3d;
+                --red: #ff4d4d;
+                --mono: 'JetBrains Mono', monospace;
+            }
+
+            html {
+                scroll-behavior: smooth;
+            }
+
+            body {
+                font-family: 'Space Grotesk', sans-serif;
+                background: var(--bg);
+                color: var(--text);
+                min-height: 100vh;
+            }
+
+            /* ── NAV ──────────────────────────── */
+            nav {
+                border-bottom: 1px solid var(--line);
+                position: sticky;
+                top: 0;
+                z-index: 100;
+                background: rgba(12, 12, 12, 0.9);
+                backdrop-filter: blur(10px);
+            }
+
+            .nav-inner {
+                max-width: 1040px;
+                margin: 0 auto;
+                padding: 0 32px;
+                height: 56px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .logo {
+                font-size: 15px;
+                font-weight: 700;
+                color: var(--text);
+                text-decoration: none;
+                letter-spacing: -0.02em;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .logo-mark {
+                font-family: var(--mono);
+                font-size: 13px;
+                background: var(--accent);
+                color: #0c0c0c;
+                padding: 2px 7px;
+                border-radius: 4px;
+                font-weight: 500;
+                letter-spacing: 0;
+            }
+
+            .nav-link {
+                font-size: 13px;
+                color: var(--text-2);
+                text-decoration: none;
+                transition: color 0.15s;
+            }
+
+            .nav-link:hover {
+                color: var(--text);
+            }
+
+            /* ── HERO ─────────────────────────── */
+            .hero {
+                max-width: 1040px;
+                margin: 0 auto;
+                padding: 80px 32px 64px;
+            }
+
+            .hero-title {
+                font-size: clamp(40px, 6vw, 72px);
+                font-weight: 700;
+                letter-spacing: -0.04em;
+                line-height: 1.05;
+                color: var(--text);
+                margin-bottom: 20px;
+            }
+
+            .hero-title em {
+                font-style: normal;
+                color: var(--accent);
+            }
+
+            .hero-desc {
+                font-size: 17px;
+                color: var(--text-2);
+                max-width: 440px;
+                line-height: 1.6;
+                font-weight: 400;
+                margin-bottom: 40px;
+            }
+
+            .hero-tags {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .tag {
+                font-family: var(--mono);
+                font-size: 11px;
+                color: var(--text-3);
+                border: 1px solid var(--line);
+                padding: 4px 10px;
+                border-radius: 3px;
+                letter-spacing: 0.02em;
+            }
+
+            /* ── CONVERTER ────────────────────── */
+            .converter {
+                max-width: 1040px;
+                margin: 0 auto;
+                padding: 0 32px 96px;
+                display: grid;
+                grid-template-columns: 1fr 340px;
+                gap: 24px;
+                align-items: start;
+            }
+
+            /* Drop zone */
+            .drop-zone {
+                border: 1px solid var(--line);
+                border-radius: 12px;
+                padding: 64px 40px;
+                text-align: center;
+                cursor: pointer;
+                transition:
+                    border-color 0.2s,
+                    background 0.15s;
+                position: relative;
+                background: var(--surface);
+            }
+
+            .drop-zone:hover,
+            .drop-zone.dragover {
+                border-color: var(--accent);
+                background: rgba(200, 255, 87, 0.03);
+            }
+
+            .drop-zone input[type='file'] {
+                position: absolute;
+                inset: 0;
+                opacity: 0;
+                cursor: pointer;
+                width: 100%;
+                height: 100%;
+            }
+
+            .drop-arrow {
+                font-family: var(--mono);
+                font-size: 32px;
+                color: var(--line-hi);
+                margin-bottom: 20px;
+                transition: color 0.2s;
+                line-height: 1;
+            }
+
+            .drop-zone:hover .drop-arrow,
+            .drop-zone.dragover .drop-arrow {
+                color: var(--accent);
+            }
+
+            .drop-text {
+                font-size: 16px;
+                font-weight: 600;
+                color: var(--text);
+                margin-bottom: 6px;
+            }
+
+            .drop-hint {
+                font-family: var(--mono);
+                font-size: 12px;
+                color: var(--text-3);
+            }
+
+            /* Right panel */
+            .panel {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .panel-block {
+                background: var(--surface);
+                border: 1px solid var(--line);
+                border-radius: 12px;
+                padding: 20px;
+            }
+
+            .panel-block-label {
+                font-family: var(--mono);
+                font-size: 10px;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.1em;
+                color: var(--text-3);
+                margin-bottom: 14px;
+            }
+
+            /* File info */
+            .file-info {
+                display: none;
+            }
+            .file-info.visible {
+                display: block;
+            }
+
+            .file-name {
+                font-size: 14px;
+                font-weight: 600;
+                color: var(--text);
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                margin-bottom: 4px;
+            }
+
+            .file-meta {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .file-size {
+                font-family: var(--mono);
+                font-size: 12px;
+                color: var(--text-2);
+            }
+
+            .file-clear {
+                font-family: var(--mono);
+                font-size: 12px;
+                color: var(--text-3);
+                background: none;
+                border: none;
+                cursor: pointer;
+                padding: 2px 0;
+                transition: color 0.15s;
+            }
+
+            .file-clear:hover {
+                color: var(--red);
+            }
+
+            /* Status */
+            .status-block {
+                display: none;
+            }
+            .status-block.info {
+                display: block;
+            }
+            .status-block.ok {
+                display: block;
+            }
+            .status-block.error {
+                display: block;
+            }
+
+            .status-block.ok .panel-block-label {
+                color: var(--accent);
+            }
+            .status-block.error .panel-block-label {
+                color: var(--red);
+            }
+
+            .status-count {
+                font-size: 28px;
+                font-weight: 700;
+                color: var(--text);
+                letter-spacing: -0.03em;
+            }
+
+            .status-count small {
+                font-size: 14px;
+                font-weight: 400;
+                color: var(--text-2);
+                letter-spacing: 0;
+                margin-left: 4px;
+            }
+
+            .status-msg {
+                font-size: 13px;
+                color: var(--text-2);
+                margin-top: 4px;
+            }
+
+            .status-block.error .status-msg {
+                color: var(--red);
+            }
+
+            /* Offset */
+            .offset-row {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .offset-label-text {
+                font-size: 14px;
+                color: var(--text-2);
+            }
+
+            .offset-ctrl {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            .offset-btn {
+                width: 28px;
+                height: 28px;
+                border: 1px solid var(--line-hi);
+                background: var(--bg);
+                color: var(--text-2);
+                border-radius: 6px;
+                cursor: pointer;
+                font-size: 16px;
+                font-family: var(--mono);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                transition:
+                    border-color 0.15s,
+                    color 0.15s;
+                user-select: none;
+            }
+
+            .offset-btn:hover {
+                border-color: var(--accent);
+                color: var(--accent);
+            }
+
+            .offset-display {
+                font-family: var(--mono);
+                font-size: 14px;
+                font-weight: 500;
+                color: var(--text);
+                min-width: 44px;
+                text-align: center;
+            }
+
+            /* Preview */
+            .preview-block {
+                display: none;
+            }
+            .preview-block.visible {
+                display: block;
+            }
+
+            pre.preview {
+                font-family: var(--mono);
+                font-size: 11px;
+                color: var(--text-2);
+                line-height: 1.8;
+                white-space: pre;
+                overflow-x: auto;
+                max-height: 160px;
+                overflow-y: auto;
+            }
+
+            pre.preview::-webkit-scrollbar {
+                width: 4px;
+                height: 4px;
+            }
+            pre.preview::-webkit-scrollbar-thumb {
+                background: var(--line-hi);
+                border-radius: 2px;
+            }
+
+            /* Download */
+            .btn-download {
+                width: 100%;
+                padding: 14px;
+                border: none;
+                border-radius: 10px;
+                background: var(--accent);
+                color: #0c0c0c;
+                font-family: 'Space Grotesk', sans-serif;
+                font-size: 15px;
+                font-weight: 700;
+                cursor: pointer;
+                transition:
+                    opacity 0.2s,
+                    transform 0.15s;
+                letter-spacing: -0.02em;
+            }
+
+            .btn-download:hover:not(:disabled) {
+                opacity: 0.88;
+                transform: translateY(-1px);
+            }
+            .btn-download:active:not(:disabled) {
+                transform: translateY(0);
+            }
+            .btn-download:disabled {
+                opacity: 0.2;
+                cursor: not-allowed;
+            }
+
+            /* ── HOW IT WORKS ─────────────────── */
+            .how {
+                border-top: 1px solid var(--line);
+                padding: 80px 32px;
+            }
+
+            .how-inner {
+                max-width: 1040px;
+                margin: 0 auto;
+            }
+
+            .how-heading {
+                font-family: var(--mono);
+                font-size: 11px;
+                font-weight: 500;
+                text-transform: uppercase;
+                letter-spacing: 0.12em;
+                color: var(--text-3);
+                margin-bottom: 40px;
+            }
+
+            .how-steps {
+                display: grid;
+                grid-template-columns: repeat(3, 1fr);
+                gap: 0;
+            }
+
+            .how-step {
+                padding: 0 40px 0 0;
+                border-right: 1px solid var(--line);
+                margin-right: 40px;
+            }
+
+            .how-step:last-child {
+                border-right: none;
+                padding-right: 0;
+                margin-right: 0;
+            }
+
+            .step-n {
+                font-family: var(--mono);
+                font-size: 11px;
+                color: var(--accent);
+                font-weight: 500;
+                margin-bottom: 12px;
+                letter-spacing: 0.04em;
+            }
+
+            .step-title {
+                font-size: 17px;
+                font-weight: 600;
+                color: var(--text);
+                letter-spacing: -0.02em;
+                margin-bottom: 10px;
+                line-height: 1.3;
+            }
+
+            .step-desc {
+                font-size: 14px;
+                color: var(--text-2);
+                line-height: 1.65;
+            }
+
+            /* ── FOOTER ───────────────────────── */
+            footer {
+                border-top: 1px solid var(--line);
+                padding: 24px 32px;
+            }
+
+            .footer-inner {
+                max-width: 1040px;
+                margin: 0 auto;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+
+            .footer-txt {
+                font-family: var(--mono);
+                font-size: 12px;
+                color: var(--text-3);
+            }
+
+            /* ── RESPONSIVE ───────────────────── */
+            @media (max-width: 780px) {
+                .converter {
+                    grid-template-columns: 1fr;
+                }
+
+                .hero-title {
+                    font-size: 38px;
+                }
+
+                .how-steps {
+                    grid-template-columns: 1fr;
+                    gap: 36px;
+                }
+
+                .how-step {
+                    border-right: none;
+                    padding-right: 0;
+                    margin-right: 0;
+                    padding-bottom: 36px;
+                    border-bottom: 1px solid var(--line);
+                }
+
+                .how-step:last-child {
+                    border-bottom: none;
+                    padding-bottom: 0;
+                }
+            }
+
+            @media (max-width: 480px) {
+                .nav-inner,
+                .hero,
+                .converter,
+                .how-inner,
+                .footer-inner {
+                    padding-left: 20px;
+                    padding-right: 20px;
+                }
+
+                .hero {
+                    padding-top: 52px;
+                    padding-bottom: 48px;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <nav>
+            <div class="nav-inner">
+                <a class="logo" href="#">
+                    <span class="logo-mark">LR→SRT</span>
+                    converter
+                </a>
+                <a class="nav-link" href="#how">How it works</a>
+            </div>
+        </nav>
+
+        <section class="hero">
+            <h1 class="hero-title">
+                LR subtitles —<br /><em>straight to SRT</em>
+            </h1>
+            <p class="hero-desc">
+                Exported subtitles from Language Reactor? Drop the HTML file and
+                get a ready-to-use SRT.
+            </p>
+        </section>
+
+        <div class="converter">
+            <!-- Drop zone -->
+            <div class="drop-zone" id="dropZone">
+                <input type="file" id="fileInput" accept=".html,.htm" />
+                <div class="drop-arrow">↓</div>
+                <div class="drop-text">Drop your .html file here</div>
+                <div class="drop-hint">or click to browse</div>
+            </div>
+
+            <!-- Right panel -->
+            <div class="panel">
+                <!-- File info -->
+                <div class="panel-block file-info" id="fileInfo">
+                    <div class="panel-block-label">File</div>
+                    <div class="file-name" id="fileInfoName"></div>
+                    <div class="file-meta">
+                        <span class="file-size" id="fileInfoSize"></span>
+                        <button class="file-clear" id="fileClear">
+                            remove
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Status -->
+                <div class="panel-block status-block" id="statusBlock">
+                    <div class="panel-block-label" id="statusLabel">Статус</div>
+                    <div class="status-count" id="statusCount"></div>
+                    <div class="status-msg" id="statusMsg"></div>
+                </div>
+
+                <!-- Preview -->
+                <div class="panel-block preview-block" id="previewBlock">
+                    <div class="panel-block-label">SRT Preview</div>
+                    <pre class="preview" id="preview"></pre>
+                </div>
+
+                <!-- Offset -->
+                <div class="panel-block">
+                    <div class="panel-block-label">Timing offset</div>
+                    <div class="offset-row">
+                        <div class="offset-ctrl">
+                            <button class="offset-btn" id="offsetMinus">
+                                −
+                            </button>
+                            <div class="offset-display" id="offsetVal">0s</div>
+                            <button class="offset-btn" id="offsetPlus">
+                                +
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Last line duration -->
+                <div class="panel-block">
+                    <div class="panel-block-label">Last line duration</div>
+                    <div class="offset-row">
+                        <div class="offset-ctrl">
+                            <button class="offset-btn" id="durMinus">−</button>
+                            <div class="offset-display" id="durVal">3s</div>
+                            <button class="offset-btn" id="durPlus">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Download -->
+                <button class="btn-download" id="downloadBtn" disabled>
+                    Download .srt
+                </button>
+            </div>
+        </div>
+
+        <section class="how" id="how">
+            <div class="how-inner">
+                <div class="how-heading">How it works</div>
+                <div class="how-steps">
+                    <div class="how-step">
+                        <div class="step-n">01</div>
+                        <div class="step-title">
+                            Export from Language Reactor
+                        </div>
+                        <div class="step-desc">
+                            In the Language Reactor extension, open an episode
+                            and click the export subtitles button — your browser
+                            will save an .html file.
+                        </div>
+                    </div>
+                    <div class="how-step">
+                        <div class="step-n">02</div>
+                        <div class="step-title">Drop it here</div>
+                        <div class="step-desc">
+                            Drag the file into the upload zone. If needed,
+                            adjust the timing offset with the + and − buttons.
+                        </div>
+                    </div>
+                    <div class="how-step">
+                        <div class="step-n">03</div>
+                        <div class="step-title">Download your SRT</div>
+                        <div class="step-desc">
+                            Hit the button and the subtitle file saves to your
+                            computer. Works in Migaku, VLC, MPV, and any other
+                            media player.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer>
+            <div class="footer-inner">
+                <span class="footer-txt">LR → SRT · Free tool</span>
+                <span class="footer-txt"
+                    >Files are processed locally — nothing is ever
+                    uploaded</span
+                >
+            </div>
+        </footer>
+
+        <script>
+            let srtContent = '';
+            let outputFilename = 'subtitles.srt';
+            let currentFile = null;
+            let offsetSec = 0;
+            let lastDuration = 3;
+
+            const dropZone = document.getElementById('dropZone');
+            const fileInput = document.getElementById('fileInput');
+            const fileInfo = document.getElementById('fileInfo');
+            const fileInfoName = document.getElementById('fileInfoName');
+            const fileInfoSize = document.getElementById('fileInfoSize');
+            const fileClear = document.getElementById('fileClear');
+            const statusBlock = document.getElementById('statusBlock');
+            const statusLabel = document.getElementById('statusLabel');
+            const statusCount = document.getElementById('statusCount');
+            const statusMsg = document.getElementById('statusMsg');
+            const previewBlock = document.getElementById('previewBlock');
+            const previewEl = document.getElementById('preview');
+            const offsetVal = document.getElementById('offsetVal');
+            const offsetMinus = document.getElementById('offsetMinus');
+            const offsetPlus = document.getElementById('offsetPlus');
+            const durVal = document.getElementById('durVal');
+            const durMinus = document.getElementById('durMinus');
+            const durPlus = document.getElementById('durPlus');
+            const downloadBtn = document.getElementById('downloadBtn');
+
+            dropZone.addEventListener('dragover', e => {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            dropZone.addEventListener('dragleave', () =>
+                dropZone.classList.remove('dragover'),
+            );
+            dropZone.addEventListener('drop', e => {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                const file = e.dataTransfer.files[0];
+                if (file) pickFile(file);
+            });
+
+            fileInput.addEventListener('change', () => {
+                if (fileInput.files[0]) pickFile(fileInput.files[0]);
+            });
+
+            fileClear.addEventListener('click', e => {
+                e.stopPropagation();
+                resetState();
+            });
+
+            offsetMinus.addEventListener('click', () => {
+                offsetSec = Math.max(-300, offsetSec - 1);
+                updateOffset();
+            });
+            offsetPlus.addEventListener('click', () => {
+                offsetSec = Math.min(300, offsetSec + 1);
+                updateOffset();
+            });
+
+            durMinus.addEventListener('click', () => {
+                lastDuration = Math.max(1, lastDuration - 1);
+                updateDur();
+            });
+            durPlus.addEventListener('click', () => {
+                lastDuration = Math.min(30, lastDuration + 1);
+                updateDur();
+            });
+
+            function updateDur() {
+                durVal.textContent = lastDuration + 's';
+                if (currentFile) processFile(currentFile);
+            }
+
+            function updateOffset() {
+                offsetVal.textContent =
+                    (offsetSec > 0 ? '+' : '') + offsetSec + 's';
+                if (currentFile) processFile(currentFile);
+            }
+
+            downloadBtn.addEventListener('click', () => {
+                if (!srtContent) return;
+                const blob = new Blob([srtContent], {
+                    type: 'text/plain;charset=utf-8',
+                });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = outputFilename;
+                a.click();
+                URL.revokeObjectURL(a.href);
+            });
+
+            function pickFile(file) {
+                if (!file.name.match(/\.html?$/i)) {
+                    showStatus(
+                        'error',
+                        'Error',
+                        '',
+                        'Only .html and .htm files are supported.',
+                    );
+                    return;
+                }
+                currentFile = file;
+                fileInfo.classList.add('visible');
+                fileInfoName.textContent = file.name;
+                fileInfoSize.textContent = formatSize(file.size);
+                processFile(file);
+            }
+
+            function processFile(file) {
+                showStatus('info', 'Status', '', 'Processing…');
+                downloadBtn.disabled = true;
+                previewBlock.classList.remove('visible');
+                srtContent = '';
+
+                const reader = new FileReader();
+                reader.onload = e => {
+                    try {
+                        const result = convert(e.target.result);
+                        srtContent = result.srt;
+                        outputFilename =
+                            file.name.replace(/\.html?$/i, '') + '.srt';
+                        showStatus(
+                            'ok',
+                            'Done',
+                            result.count + '<small>lines</small>',
+                            '',
+                        );
+                        previewEl.textContent =
+                            srtContent.slice(0, 800) +
+                            (srtContent.length > 800 ? '\n…' : '');
+                        previewBlock.classList.add('visible');
+                        downloadBtn.disabled = false;
+                    } catch (err) {
+                        showStatus('error', 'Error', '', err.message);
+                    }
+                };
+                reader.readAsText(file, 'UTF-8');
+            }
+
+            function resetState() {
+                currentFile = null;
+                srtContent = '';
+                fileInput.value = '';
+                fileInfo.classList.remove('visible');
+                statusBlock.className = 'panel-block status-block';
+                previewBlock.classList.remove('visible');
+                downloadBtn.disabled = true;
+            }
+
+            function showStatus(type, label, count, msg) {
+                statusBlock.className = 'panel-block status-block ' + type;
+                statusLabel.textContent = label;
+                statusCount.innerHTML = count;
+                statusMsg.textContent = msg;
+            }
+
+            function convert(html) {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const rows = doc.querySelectorAll('table tr');
+                const entries = [];
+
+                for (const row of rows) {
+                    const cells = row.querySelectorAll('td');
+                    if (cells.length < 2) continue;
+                    const timeText = cells[0].textContent.trim();
+                    if (!isValidTime(timeText)) continue;
+
+                    const textCell = cells[1];
+                    textCell
+                        .querySelectorAll('.lln-star-and-menu-buttons')
+                        .forEach(el => el.remove());
+
+                    let text = '';
+                    const spans = textCell.querySelectorAll(
+                        '.lln-word, .lln-not-word',
+                    );
+                    spans.length > 0
+                        ? spans.forEach(s => {
+                              text += s.textContent;
+                          })
+                        : (text = textCell.textContent);
+
+                    text = text.trim();
+                    if (!text) continue;
+                    entries.push({ timeText, text });
+                }
+
+                if (entries.length === 0)
+                    throw new Error(
+                        'No subtitles found. Make sure this is a valid Language Reactor export.',
+                    );
+
+                const lines = [];
+                for (let i = 0; i < entries.length; i++) {
+                    const start = parseTime(entries[i].timeText) + offsetSec;
+                    const end =
+                        i + 1 < entries.length
+                            ? parseTime(entries[i + 1].timeText) + offsetSec
+                            : start + lastDuration;
+                    lines.push(String(i + 1));
+                    lines.push(
+                        fmtTime(Math.max(0, start)) +
+                            ' --> ' +
+                            fmtTime(Math.max(0, end)),
+                    );
+                    lines.push(entries[i].text);
+                    lines.push('');
+                }
+
+                return { srt: lines.join('\n'), count: entries.length };
+            }
+
+            function isValidTime(s) {
+                return /^\d{1,2}:\d{2}(:\d{2})?$/.test(s);
+            }
+
+            function parseTime(s) {
+                const p = s.split(':').map(Number);
+                if (p.length === 3) return p[0] * 3600 + p[1] * 60 + p[2];
+                if (p.length === 2) return p[0] * 60 + p[1];
+                return 0;
+            }
+
+            function fmtTime(t) {
+                const ms = Math.round((t % 1) * 1000);
+                const s = Math.floor(t) % 60;
+                const m = Math.floor(t / 60) % 60;
+                const h = Math.floor(t / 3600);
+                return `${pad(h)}:${pad(m)}:${pad(s)},${pad(ms, 3)}`;
+            }
+
+            function pad(n, l = 2) {
+                return String(n).padStart(l, '0');
+            }
+
+            function formatSize(b) {
+                if (b < 1024) return b + ' B';
+                if (b < 1048576) return (b / 1024).toFixed(1) + ' KB';
+                return (b / 1048576).toFixed(1) + ' MB';
+            }
+        </script>
+    </body>
+</html>
