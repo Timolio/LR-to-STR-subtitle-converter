@@ -528,6 +528,95 @@
                 color: var(--text-3);
             }
 
+            /* ── INPUT TABS ───────────────────── */
+            .input-area {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+            }
+
+            .input-tabs {
+                display: flex;
+                gap: 4px;
+                background: var(--surface);
+                border: 1px solid var(--line);
+                border-radius: 10px;
+                padding: 4px;
+                width: fit-content;
+            }
+
+            .input-tab {
+                padding: 6px 18px;
+                border: none;
+                background: transparent;
+                color: var(--text-2);
+                font-family: 'Space Grotesk', sans-serif;
+                font-size: 13px;
+                font-weight: 500;
+                cursor: pointer;
+                border-radius: 7px;
+                transition:
+                    background 0.15s,
+                    color 0.15s;
+                letter-spacing: -0.01em;
+            }
+
+            .input-tab.active {
+                background: var(--line-hi);
+                color: var(--text);
+            }
+
+            /* Paste zone */
+            .paste-zone {
+                display: none;
+                border: 1px solid var(--line);
+                border-radius: 12px;
+                background: var(--surface);
+                flex-direction: column;
+                overflow: hidden;
+            }
+
+            .paste-zone.visible {
+                display: flex;
+            }
+
+            .paste-input {
+                width: 100%;
+                min-height: 220px;
+                padding: 24px;
+                background: transparent;
+                border: none;
+                border-bottom: 1px solid var(--line);
+                color: var(--text);
+                font-family: var(--mono);
+                font-size: 11.5px;
+                line-height: 1.7;
+                resize: vertical;
+                outline: none;
+            }
+
+            .paste-input::placeholder {
+                color: var(--text-3);
+            }
+
+            .btn-convert {
+                padding: 14px 24px;
+                border: none;
+                background: transparent;
+                color: var(--accent);
+                font-family: 'Space Grotesk', sans-serif;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                letter-spacing: -0.02em;
+                transition: background 0.15s;
+                text-align: left;
+            }
+
+            .btn-convert:hover {
+                background: rgba(200, 255, 87, 0.05);
+            }
+
             /* ── RESPONSIVE ───────────────────── */
             @media (max-width: 780px) {
                 .converter {
@@ -596,12 +685,31 @@
         </section>
 
         <div class="converter">
-            <!-- Drop zone -->
-            <div class="drop-zone" id="dropZone">
-                <input type="file" id="fileInput" accept=".html,.htm" />
-                <div class="drop-arrow">↓</div>
-                <div class="drop-text">Drop your .html file here</div>
-                <div class="drop-hint">or click to browse</div>
+            <!-- Input area with tabs -->
+            <div class="input-area">
+                <div class="input-tabs">
+                    <button class="input-tab active" id="tabFile">Upload file</button>
+                    <button class="input-tab" id="tabPaste">Paste HTML</button>
+                </div>
+
+                <!-- Drop zone -->
+                <div class="drop-zone" id="dropZone">
+                    <input type="file" id="fileInput" accept=".html,.htm" />
+                    <div class="drop-arrow">↓</div>
+                    <div class="drop-text">Drop your .html file here</div>
+                    <div class="drop-hint">or click to browse</div>
+                </div>
+
+                <!-- Paste zone -->
+                <div class="paste-zone" id="pasteZone">
+                    <textarea
+                        class="paste-input"
+                        id="pasteInput"
+                        placeholder="Paste your Language Reactor HTML export here…"
+                        spellcheck="false"
+                    ></textarea>
+                    <button class="btn-convert" id="convertBtn">→ Convert to SRT</button>
+                </div>
             </div>
 
             <!-- Right panel -->
@@ -716,10 +824,16 @@
             let srtContent = '';
             let outputFilename = 'subtitles.srt';
             let currentFile = null;
+            let currentHtmlText = null;
             let offsetSec = 0;
             let lastDuration = 3;
 
+            const tabFile = document.getElementById('tabFile');
+            const tabPaste = document.getElementById('tabPaste');
             const dropZone = document.getElementById('dropZone');
+            const pasteZone = document.getElementById('pasteZone');
+            const pasteInput = document.getElementById('pasteInput');
+            const convertBtn = document.getElementById('convertBtn');
             const fileInput = document.getElementById('fileInput');
             const fileInfo = document.getElementById('fileInfo');
             const fileInfoName = document.getElementById('fileInfoName');
@@ -738,6 +852,31 @@
             const durMinus = document.getElementById('durMinus');
             const durPlus = document.getElementById('durPlus');
             const downloadBtn = document.getElementById('downloadBtn');
+
+            tabFile.addEventListener('click', () => {
+                tabFile.classList.add('active');
+                tabPaste.classList.remove('active');
+                dropZone.style.display = '';
+                pasteZone.classList.remove('visible');
+                resetState();
+            });
+
+            tabPaste.addEventListener('click', () => {
+                tabPaste.classList.add('active');
+                tabFile.classList.remove('active');
+                dropZone.style.display = 'none';
+                pasteZone.classList.add('visible');
+                resetState();
+            });
+
+            convertBtn.addEventListener('click', () => {
+                const html = pasteInput.value.trim();
+                if (!html) return;
+                currentHtmlText = html;
+                currentFile = null;
+                fileInfo.classList.remove('visible');
+                processHtml(html);
+            });
 
             dropZone.addEventListener('dragover', e => {
                 e.preventDefault();
@@ -783,12 +922,14 @@
             function updateDur() {
                 durVal.textContent = lastDuration + 's';
                 if (currentFile) processFile(currentFile);
+                else if (currentHtmlText) processHtml(currentHtmlText);
             }
 
             function updateOffset() {
                 offsetVal.textContent =
                     (offsetSec > 0 ? '+' : '') + offsetSec + 's';
                 if (currentFile) processFile(currentFile);
+                else if (currentHtmlText) processHtml(currentHtmlText);
             }
 
             downloadBtn.addEventListener('click', () => {
@@ -851,8 +992,34 @@
                 reader.readAsText(file, 'UTF-8');
             }
 
+            function processHtml(html) {
+                showStatus('info', 'Status', '', 'Processing…');
+                downloadBtn.disabled = true;
+                previewBlock.classList.remove('visible');
+                srtContent = '';
+                try {
+                    const result = convert(html);
+                    srtContent = result.srt;
+                    outputFilename = 'subtitles.srt';
+                    showStatus(
+                        'ok',
+                        'Done',
+                        result.count + '<small>lines</small>',
+                        '',
+                    );
+                    previewEl.textContent =
+                        srtContent.slice(0, 800) +
+                        (srtContent.length > 800 ? '\n…' : '');
+                    previewBlock.classList.add('visible');
+                    downloadBtn.disabled = false;
+                } catch (err) {
+                    showStatus('error', 'Error', '', err.message);
+                }
+            }
+
             function resetState() {
                 currentFile = null;
+                currentHtmlText = null;
                 srtContent = '';
                 fileInput.value = '';
                 fileInfo.classList.remove('visible');
